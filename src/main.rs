@@ -4,7 +4,7 @@ use serde::ser::Error as _;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct Request {
     path: String,
 }
@@ -42,7 +42,7 @@ async fn main() -> Result<(), Error> {
 pub(crate) async fn my_handler(event: Request, ctx: Context) -> Result<Response, Error> {
 
     let resp = Response {
-        body: DoublyEncoade(ResponseBody {hello: String::from("world")}),
+        body: DoublyEncode(ResponseBody {hello: format!("world: {:?}", event)}),
         statusCode: String::from("200")
     };
 
