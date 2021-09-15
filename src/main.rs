@@ -11,11 +11,21 @@ struct Request {
     path: String,
 }
 
+// Note: These field names are significant.
+//
+// For more information, see:
+// https://docs.aws.amazon.com/
+//     apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html
+//     #api-gateway-simple-proxy-for-lambda-output-format
+//
+// 
+// #[allow(non_snake_case)]
 #[derive(Serialize)]
 struct Response {
     body: DoublyEncode<ResponseBody>,
     // This should be a u32, but API Gateway actually expects a String that looking like an int for some reason.
-    statusCode: String
+    #[serde(rename="statusCode")]
+    status_code: String,
 }
 
 struct DoublyEncode<T>(pub T);
@@ -47,7 +57,7 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-pub(crate) async fn my_handler(event: Request, ctx: Context) -> Result<Response, Error> {
+pub(crate) async fn my_handler(event: Request, _ctx: Context) -> Result<Response, Error> {
     // a correct input path will always be of form `/C/GAME` where C is a
     // single character command code and GAME is a multiple-character string
     // describing the game state.
@@ -113,14 +123,14 @@ pub(crate) async fn my_handler(event: Request, ctx: Context) -> Result<Response,
     let resp = Response {
         body: DoublyEncode(ResponseBody {
             // request: format!("{:?}", event),
-            // ctx: format!("{:?}", ctx),
+            // ctx: format!("{:?}", _ctx),
             command,
             parsed_game_state,
             next_game_states,
             selected_move,
             victory,
         }),
-        statusCode: String::from("200")
+        status_code: String::from("200")
     };
 
     Ok(resp)
@@ -155,7 +165,7 @@ struct TicTacToeGame {
 
 impl Game for TicTacToeGame {
     fn unparse(&self) -> String {
-        self.board.into_iter().collect()
+        self.board.iter().collect()
     }
 
     fn parse(input: &str) -> Result<Self, Cow<str>> {
