@@ -47,6 +47,7 @@ struct ResponseBody {
     parsed_game_state: String,
     next_game_states: Option<Vec<(String, String)>>,
     selected_move: Option<(String, String)>,
+    text: Option<String>,
     victory: Option<String>,
 }
 
@@ -83,11 +84,13 @@ pub(crate) async fn my_handler(event: Request, _ctx: Context) -> Result<Response
     #[derive(Debug)]
     enum Command {
         List,
+        RenderToText,
         Select,
     }
 
     let c = match cmd {
         "l" => Command::List,
+        "r" => Command::RenderToText,
         "s" => Command::Select,
         _ => return Err(Box::new(UnknownCommand)),
     };
@@ -97,6 +100,7 @@ pub(crate) async fn my_handler(event: Request, _ctx: Context) -> Result<Response
     let parsed_game_state = game.unparse();
     let next_game_states;
     let selected_move;
+    let text;
     let victory;
     
     match c {
@@ -108,6 +112,14 @@ pub(crate) async fn my_handler(event: Request, _ctx: Context) -> Result<Response
                 .collect());
             selected_move = None;
             victory = None;
+            text = None;
+        }
+        Command::RenderToText => {
+            command = "render-to-text".to_string();
+            next_game_states = None;
+            selected_move = None;
+            victory = None;
+            text = Some(game.render_to_text());
         }
         Command::Select => {
             command = "select".to_string();
@@ -117,6 +129,7 @@ pub(crate) async fn my_handler(event: Request, _ctx: Context) -> Result<Response
             let choice = &moves[chosen];
             selected_move = Some((choice.id.to_string(), choice.next_state.board.iter().collect()));
             victory = choice.victor.map(|c|c.to_string());
+            text = None;
         }
     }
         
@@ -128,6 +141,7 @@ pub(crate) async fn my_handler(event: Request, _ctx: Context) -> Result<Response
             parsed_game_state,
             next_game_states,
             selected_move,
+            text,
             victory,
         }),
         status_code: String::from("200")
@@ -153,6 +167,7 @@ trait Game: Sized {
     fn parse(input: &str) -> Result<Self, Cow<str>>;
     fn unparse(&self) -> String;
     fn moves(&self) -> Vec<Move<Self>>;
+    fn render_to_text(&self) -> String;
 }
 
 type TicTacToeBoard = [char; 9];
@@ -210,6 +225,27 @@ impl Game for TicTacToeGame {
             }
         }
         return v;
+    }
+    
+    fn render_to_text(&self) -> String {
+        match self.board {
+            [a, b, c,
+             m, n, o,
+             x, y, z] => {
+                // converts the char for a cell state into a three character string.
+                fn pad(c: char) -> String {
+                    format!(" {} ", if c == '_' { ' ' } else { c })
+                }
+                format!("{a} | {b} | {c} \n\
+                         ----|-----|-----\n\
+                         {m} | {n} | {o} \n\
+                         ----|-----|-----\n\
+                         {x} | {y} | {z} \n",
+                         a=pad(a), b=pad(b), c=pad(c),
+                         m=pad(m), n=pad(n), o=pad(o), 
+                         x=pad(x), y=pad(y), z=pad(z))
+            }
+        }
     }
 }
 
