@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 type Res<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync >>;
 
-use futures::{future::FutureExt, StreamExt};
+use futures::StreamExt;
 
 use crossterm::{
     cursor,
@@ -47,9 +47,11 @@ struct QuitGame;
 async fn handle_human_player(session: &mut Session) -> Res<Result<MoveDescription, QuitGame>>
 {
     let rendered = session.rendered_board().await?;
-    let num_lines = rendered.matches('\n').count();
+    let num_lines = rendered.lines().count();
 
-    render_board(&mut session.stdout, 1, &rendered)?;
+    let stdout = &mut session.stdout;
+    clear_lines(stdout, 1, rendered.lines().count())?;
+    render_board(stdout, 1, &rendered)?;
 
     session.stdout
         .execute(cursor::MoveTo(1, num_lines as u16 + 1))?
@@ -87,8 +89,6 @@ async fn handle_human_player(session: &mut Session) -> Res<Result<MoveDescriptio
         // Tracks the user's selected move choice as user types its characters.
         let mut input_choice = String::new();
 
-        // Tracks the currently previewed move, if any.
-        let mut preview: Option<String> = None;
         // Tracks number of lines of output from previous preview, if any, below the query line.
         let mut preview_length = 0;
         // Tracks maximum length of any previous preview. This is used as a
@@ -109,11 +109,10 @@ async fn handle_human_player(session: &mut Session) -> Res<Result<MoveDescriptio
                 let render_cmd = session.url_core.r(&b);
                 let rendered = ask::<RenderResponse>(&render_cmd).await?;
 
-                // delete any past preview.
-                session.stdout.execute(cursor::SavePosition)?;
-                clear_lines(&mut session.stdout, query_line + 1, preview_length)?;
+                // delete any past preview, along with enough space to do this render
+                let clear_length = std::cmp::max(rendered.text.lines().count(), preview_length);
+                clear_lines(&mut session.stdout, query_line + 1, clear_length)?;
                 render_board(&mut session.stdout, query_line + 1, &rendered.text)?;
-                session.stdout.execute(cursor::RestorePosition)?;
                 Ok(Some(rendered.text))
             } else {
                 Ok(None)
@@ -133,25 +132,9 @@ async fn handle_human_player(session: &mut Session) -> Res<Result<MoveDescriptio
                 .execute(Print(&input_choice))?
                 ;
 
-
-
-
-
             terminal::enable_raw_mode()?;
-            let event = reader.next().fuse();
-            let maybe_event = tokio::select! {
-                Ok(Some(rendered)) = preview_board(session, query_line, preview_length, preview.take()) => {
-                    preview_length = rendered.lines().count();
-                    max_preview_length = std::cmp::max(max_preview_length, preview_length);
-                    reader.next().await
-                }
-                maybe_event = event => {
-                    preview = None;
-                    preview_length = 0;
-                    maybe_event
-                }
-            };
-            match maybe_event {
+            let event = reader.next().await;
+            match event {
                 Some(Ok(Event::Key(event))) => {
                     terminal::disable_raw_mode()?;
                     debug!("{:?}", event);
@@ -172,16 +155,18 @@ async fn handle_human_player(session: &mut Session) -> Res<Result<MoveDescriptio
                 other => debug!("{:?}", other),
             }
 
-            clear_lines(&mut session.stdout, query_line + 1, preview_length)?;
+            clear_lines(&mut session.stdout, query_line, max_preview_length + 2)?;
 
             for desc in &moves {
                 if &desc.move_id == &input_choice {
-                    preview = Some(desc.next_board.clone());
-                    /*
-                    let rendered = preview_board(session, query_line + 1, &desc.next_board).await?;
-                    preview_length = rendered.lines().count();
-                    max_preview_length = std::cmp::max(max_preview_length, preview_length);
-                     */
+                    let rendered = preview_board(session,
+                                                 query_line,
+                                                 preview_length,
+                                                 Some(desc.next_board.clone())).await?;
+                    if let Some(rendered) = rendered {
+                        preview_length = rendered.lines().count();
+                        max_preview_length = std::cmp::max(max_preview_length, preview_length);
+                    }
                     break;
                 }
             }
@@ -190,7 +175,7 @@ async fn handle_human_player(session: &mut Session) -> Res<Result<MoveDescriptio
         for desc in &moves {
             if &desc.move_id == &input_choice {
                 // delete any past preview, then return the selected choice
-                clear_lines(&mut session.stdout, query_line + 1, preview_length)?;
+                clear_lines(&mut session.stdout, query_line , preview_length + 1)?;
                 return Ok(Ok(desc.clone()));
             }
         }
@@ -199,7 +184,7 @@ async fn handle_human_player(session: &mut Session) -> Res<Result<MoveDescriptio
         session.stdout
             .execute(cursor::MoveTo(1, msg_line))?
             .execute(Print(&format!("You typed `{}`; but you need to select \
-                                     one of the {} moves listed above",
+                                     one of the {} moves listed above (or 'q' to quit)",
                                     input_choice, moves.len())))?
             .execute(cursor::MoveTo(1, query_line + max_preview_length as u16 + 1))?
             .execute(cursor::MoveTo(1, msg_line + 1))?
@@ -225,7 +210,6 @@ fn render_board(stdout: &mut impl crossterm::ExecutableCommand,
                 rendered: &str)
                 -> Res<()>
 {
-    clear_lines(stdout, start_line, rendered.lines().count())?;
 
     for (j, line) in rendered.lines().enumerate() {
         stdout
