@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use serde::ser::Error as _;
 
 use std::borrow::Cow;
+use std::default::Default;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -45,10 +46,18 @@ struct ResponseBody {
     // ctx: String,
     command: String,
     parsed_game_state: String,
-    next_game_states: Option<Vec<(String, String)>>,
+    player: String,
+    next_game_states: Option<Vec<MoveDescription>>,
     selected_move: Option<(String, String)>,
     text: Option<String>,
     victory: Option<String>,
+}
+
+#[derive(Serialize)]
+struct MoveDescription {
+    move_id: String,
+    next_board: String,
+    next_player: String,
 }
 
 #[tokio::main]
@@ -59,9 +68,12 @@ async fn main() -> Result<(), Error> {
 }
 
 pub(crate) async fn my_handler(event: Request, _ctx: Context) -> Result<Response, Error> {
-    // a correct input path will always be of form `/C/GAME` where C is a
+    // a correct input path will tend to be of form `/C/GAME` where C is a
     // single character command code and GAME is a multiple-character string
     // describing the game state.
+    //
+    // The main exception is creating a fresh game, which just takes the form `/n/`, with no need
+    // for a further string.
 
     // drop the leading `/`
     let (slash, input) = event.path.split_at(1);
@@ -81,21 +93,24 @@ pub(crate) async fn my_handler(event: Request, _ctx: Context) -> Result<Response
         
     }
 
-    #[derive(Debug)]
+    #[derive(PartialEq, Eq, Debug)]
     enum Command {
+        NewGame,
         List,
         RenderToText,
         Select,
     }
 
     let c = match cmd {
+        "n" => Command::NewGame,
         "l" => Command::List,
         "r" => Command::RenderToText,
         "s" => Command::Select,
         _ => return Err(Box::new(UnknownCommand)),
     };
 
-    let game = TicTacToeGame::parse(state)?;
+    let game = if c == Command::NewGame { Default::default() } else { TicTacToeGame::parse(state)? };
+    let player = game.player.to_string();
     let command;
     let parsed_game_state = game.unparse();
     let next_game_states;
@@ -104,11 +119,22 @@ pub(crate) async fn my_handler(event: Request, _ctx: Context) -> Result<Response
     let victory;
     
     match c {
+        Command::NewGame => {
+            command = "new-game".to_string();
+            next_game_states = None;
+            selected_move = None;
+            text = None;
+            victory = None;
+        }
         Command::List => {
             command = "list".to_string();
             next_game_states = Some(game.moves()
                 .into_iter()
-                .map(|m| (m.id.to_string(), m.next_state.unparse()))
+                .map(|m| MoveDescription {
+                    move_id: m.id.to_string(),
+                    next_board: m.next_state.unparse(),
+                    next_player: m.next_state.player.to_string(),
+                })
                 .collect());
             selected_move = None;
             victory = None;
@@ -139,6 +165,7 @@ pub(crate) async fn my_handler(event: Request, _ctx: Context) -> Result<Response
             // ctx: format!("{:?}", _ctx),
             command,
             parsed_game_state,
+            player,
             next_game_states,
             selected_move,
             text,
@@ -177,6 +204,13 @@ struct TicTacToeGame {
     board: TicTacToeBoard,
     player: Player,
 }
+
+impl Default for TicTacToeGame {
+    fn default() -> Self {
+        Self { board: ['_'; 9], player: 'X' }
+    }
+}
+
 
 impl Game for TicTacToeGame {
     fn unparse(&self) -> String {
