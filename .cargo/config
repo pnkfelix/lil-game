@@ -1,2 +1,2 @@
 [build]
-target-dir = "../my-target"
+target-dir = "/home/ec2-user/environment/my-target"
