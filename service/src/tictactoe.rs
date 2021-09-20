@@ -94,6 +94,17 @@ impl Game for TicTacToeGame {
             }
         }
     }
+
+    fn value_for(&self, p: Player) -> i64 {
+        let other = if p == 'X' { 'O' } else { 'X' };
+        if victory(&self.board, p) == Some(p) {
+            100000
+        } else if victory(&self.board, other) == Some(other) {
+            -100000
+        } else {
+            0
+        }
+    }
 }
 
 fn victory(board: &TicTacToeBoard, player: Player) -> Option<Player> {

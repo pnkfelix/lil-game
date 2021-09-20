@@ -91,13 +91,17 @@ pub trait Game: Sized + Clone + Default {
     /// Renders the game state into a human visible depiction of the globally
     /// visible board.
     fn render_to_text(&self) -> String;
+
+    /// Produces an valuation of the game state for a given player: larger is
+    /// better for that player. For example, if a game is a guaranteed win for
+    /// `p`, then `value_for(p)` might return 100,000 here, and if it is a
+    /// guaranteed loss, it might return -100,000.
+    fn value_for(&self, p: Player) -> i64;
 }
 
-// FIXME: The interface for `Game` does not yet carry enough info for us to
-// generically make choices here.
-
-/// Chooses the best move amongst a provided set of moves.
-pub fn search<B: Game>(moves: &[Move<B>]) -> &Move<B> {
+/// Chooses the "best" move amongst a provided set of moves.
+pub async fn search<B: Game>(moves: &[Move<B>]) -> &Move<B> {
+    // Note: this strategy can clearly be improved upon.
     &moves[0]
 }
 

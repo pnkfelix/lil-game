@@ -10,7 +10,8 @@ mod tictactoe;
 
 type TheGame = crate::tictactoe::TicTacToeGame;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
     let stdin = io::stdin();
@@ -141,7 +142,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             Command::Select => {
                 let next_moves = game.moves();
-                let choice = game_core::search(&next_moves);
+                let choice = game_core::search(&next_moves).await;
                 println!("select {:?} : {:?}", unparsed, choice);
                 println!("AI chose\n{}", choice.next_state.render_to_text());
 

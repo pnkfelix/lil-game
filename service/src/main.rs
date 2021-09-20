@@ -133,7 +133,7 @@ pub(crate) async fn my_handler(event: Request, _ctx: Context) -> Result<Response
             command = "select".to_string();
             next_game_states = None;
             let moves = game.moves();
-            let choice = game_core::search(&moves[..]);
+            let choice = game_core::search(&moves[..]).await;
             selected_move = Some((choice.id.to_string(), choice.next_state.board.iter().collect()));
             victory = choice.end_game.as_ref().map(|v| {
                 v.iter().map(|c|c.to_string()).collect()
