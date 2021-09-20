@@ -56,7 +56,7 @@ impl Game for TicTacToeGame {
                 let avail = space_available(&next_board);
                 let end_game = if let Some(p) = victor {
                     Some(Some(p).into_iter().collect())
-                } else if avail {
+                } else if !avail {
                     Some(None.into_iter().collect())
                 } else {
                     None
