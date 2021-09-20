@@ -36,7 +36,7 @@ pub type MoveId = u32;
 /// moves), the next state of the game, and, for convenience, a `end_game`
 /// field: when a move results in the end of the game, `end_game` will be set to
 /// `Some(victors)`.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Move<B: Game> {
     /// Uniquely identifies this move amongst its siblings for a given game
     /// state.
@@ -57,6 +57,8 @@ pub struct Move<B: Game> {
 /// text, or you can query it for a list of possible actions ("moves") to take
 /// on the game state.
 ///
+/// A valid initial game state can be build via `Default::default()`.
+///
 /// The games we use as examples will be simple enough to have human-readable
 /// strings for their serialized representation. For example, tictactoe can be
 /// summarized with a string of 9 characters, where each character is either
@@ -65,7 +67,7 @@ pub struct Move<B: Game> {
 /// Also, since we will be embedding these strings directly into the service
 /// URI, the serialized strings should be valid path segments for a URI: so, to
 /// be safe, stick to non-whitespace alphanumeric characters, or '-'.
-pub trait Game: Sized + Clone {
+pub trait Game: Sized + Clone + Default {
     const NAME: &'static str;
 
     /// Deserializes an input string to an instance of the game, or returns an
