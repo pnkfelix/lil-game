@@ -77,6 +77,9 @@ pub trait Game: Sized + Clone + Default {
     /// Converts a game state to its corresponding serialized string.
     fn unparse(&self) -> String;
 
+    /// Returns the current player that needs to take an action on this board
+    fn current_player(&self) -> Player;
+
     /// Produces the set of "moves" that are available to take from the current
     /// game state.
     ///
@@ -99,8 +102,8 @@ pub trait Game: Sized + Clone + Default {
     fn value_for(&self, p: Player) -> i64;
 }
 
-/// Chooses the "best" move amongst a provided set of moves.
-pub async fn search<B: Game>(moves: &[Move<B>]) -> &Move<B> {
+/// Chooses the "best" move for `p` amongst a provided set of moves.
+pub async fn search<B: Game>(moves: &[Move<B>], _p: Player) -> &Move<B> {
     // Note: this strategy can clearly be improved upon.
     &moves[0]
 }

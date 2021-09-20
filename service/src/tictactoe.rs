@@ -18,6 +18,10 @@ impl Default for TicTacToeGame {
 impl Game for TicTacToeGame {
     const NAME: &'static str = "TicTacToe";
 
+    fn current_player(&self) -> Player {
+        self.player
+    }
+
     fn unparse(&self) -> String {
         self.board.iter().collect()
     }

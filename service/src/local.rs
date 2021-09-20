@@ -142,7 +142,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             Command::Select => {
                 let next_moves = game.moves();
-                let choice = game_core::search(&next_moves).await;
+                let choice = game_core::search(&next_moves, game.current_player()).await;
                 println!("select {:?} : {:?}", unparsed, choice);
                 println!("AI chose\n{}", choice.next_state.render_to_text());
 
